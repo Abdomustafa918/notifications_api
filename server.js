@@ -19,6 +19,8 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
+const db = admin.firestore();
+
 // ===============================
 // 🔥 الصفحة الرئيسية
 // ===============================
@@ -27,11 +29,11 @@ app.get("/", (req, res) => {
 });
 
 // ===============================
-// 🔥 API لإرسال الإشعار (يدعم token + topic)
+// 🔥 API لإرسال الإشعار + حفظه في Firestore
 // ===============================
 app.post("/send-notification", async (req, res) => {
   try {
-    const { title, body, token, topic } = req.body;
+    const { title, body, token, topic, type } = req.body;
 
     let message;
 
@@ -53,17 +55,33 @@ app.post("/send-notification", async (req, res) => {
 
     // لو مفيش لا token ولا topic
     else {
-      return res
-        .status(400)
-        .json({ error: "Either 'token' or 'topic' is required!" });
+      return res.status(400).json({
+        error: "Either 'token' or 'topic' is required!",
+      });
     }
 
+    // 🔥 إرسال الإشعار عبر Firebase Messaging
     const response = await admin.messaging().send(message);
     console.log("✅ Notification sent:", response);
 
-    res.json({ success: true, response });
+    // 🔥 حفظ الإشعار داخل Firestore
+    await db.collection("notifications").add({
+      title,
+      body,
+      type: type || "general", // نوع الإشعار (منتج جديد — عرض جديد — ...إلخ)
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    console.log("💾 Notification saved to Firestore!");
+
+    res.json({
+      success: true,
+      message: "Notification sent & saved!",
+      firebaseResponse: response,
+    });
+
   } catch (error) {
-    console.error("❌ Error sending notification:", error);
+    console.error("❌ Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -72,4 +90,6 @@ app.post("/send-notification", async (req, res) => {
 // 🔥 تشغيل السيرفر
 // ===============================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`🚀 Server running on port ${PORT}`)
+);
