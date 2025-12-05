@@ -20,27 +20,43 @@ admin.initializeApp({
 });
 
 // ===============================
-// 🔥 الصفحة الرئيسية (مهم لرؤية السيرفر شغال)
+// 🔥 الصفحة الرئيسية
 // ===============================
 app.get("/", (req, res) => {
   res.send("🚀 Notification API is running!");
 });
 
 // ===============================
-// 🔥 API لإرسال الإشعار
+// 🔥 API لإرسال الإشعار (يدعم token + topic)
 // ===============================
 app.post("/send-notification", async (req, res) => {
   try {
-    const { title, body, token } = req.body;
+    const { title, body, token, topic } = req.body;
 
-    if (!token) {
-      return res.status(400).json({ error: "Token is required" });
+    let message;
+
+    // إذا كان الإرسال لمستخدم معيّن عبر Token
+    if (token) {
+      message = {
+        notification: { title, body },
+        token,
+      };
     }
 
-    const message = {
-      notification: { title, body },
-      token,
-    };
+    // إذا كان الإرسال لجميع المستخدمين عبر Topic
+    else if (topic) {
+      message = {
+        notification: { title, body },
+        topic,
+      };
+    }
+
+    // لو مفيش لا token ولا topic
+    else {
+      return res
+        .status(400)
+        .json({ error: "Either 'token' or 'topic' is required!" });
+    }
 
     const response = await admin.messaging().send(message);
     console.log("✅ Notification sent:", response);
@@ -53,7 +69,7 @@ app.post("/send-notification", async (req, res) => {
 });
 
 // ===============================
-// 🔥 تشغيل السيرفر (Railway يحتاج PORT المتغير)
+// 🔥 تشغيل السيرفر
 // ===============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
